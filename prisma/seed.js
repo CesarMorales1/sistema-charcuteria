@@ -4,7 +4,25 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Iniciando seeder para Superusuario y Permisos...');
+  console.log('🌱 Iniciando seeder para Superusuario, Permisos y Monedas...');
+
+  // 0. Crear monedas base (VES principal, USD y COP)
+  const monedasData = [
+    { codigo: 'VES', nombre: 'Bolívar Venezolano', simbolo: 'Bs.', es_principal: false },
+    { codigo: 'USD', nombre: 'Dólar Estadounidense', simbolo: '$', es_principal: true },
+    { codigo: 'COP', nombre: 'Peso Colombiano', simbolo: '$', es_principal: false },
+  ];
+
+  console.log('Creando monedas base...');
+  for (const m of monedasData) {
+    const existe = await prisma.moneda.findFirst({ where: { codigo: m.codigo } });
+    if (!existe) {
+      await prisma.moneda.create({ data: m });
+      console.log(`  ✅ Moneda ${m.codigo} creada`);
+    } else {
+      console.log(`  ⚠️  Moneda ${m.codigo} ya existe (id=${existe.id_moneda})`);
+    }
+  }
 
   // 1. Crear permisos base del sistema
   const permisosData = [
@@ -38,7 +56,7 @@ async function main() {
   if (!existingAdmin) {
     console.log('Creando superusuario admin...');
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
-    
+
     const nuevoAdmin = await prisma.usuario.create({
       data: {
         nombre: 'Administrador del Sistema',
@@ -51,9 +69,9 @@ async function main() {
 
     // 3. Asignar TODOS los permisos al admin
     const todosLosPermisos = await prisma.permiso.findMany();
-    
+
     console.log(`Asignando ${todosLosPermisos.length} permisos al superusuario...`);
-    
+
     const usuarioPermisosData = todosLosPermisos.map(p => ({
       id_usuario: nuevoAdmin.id_usuario,
       id_permiso: p.id_permiso
