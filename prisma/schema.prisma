@@ -1,0 +1,346 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id_usuario     Int      @id @default(autoincrement())
+  nombre         String   @db.VarChar(100)
+  email          String   @unique @db.VarChar(100)
+  password       String   @db.VarChar(255)
+  rol            Rol      @default(cajero)
+  activo         Boolean  @default(true)
+  fecha_creacion DateTime @default(now())
+
+  permisos  UsuarioPermiso[]
+  auditorias Auditoria[]
+  movimientos MovimientoInventario[]
+
+  @@map("usuario")
+}
+
+model Permiso {
+  id_permiso  Int     @id @default(autoincrement())
+  nombre      String  @unique @db.VarChar(50)
+  descripcion String? @db.Text
+  modulo      String? @db.VarChar(30)
+
+  usuarios UsuarioPermiso[]
+
+  @@map("permiso")
+}
+
+model UsuarioPermiso {
+  id_usuario_permiso Int @id @default(autoincrement())
+  id_usuario         Int
+  id_permiso         Int
+
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario])
+  permiso Permiso @relation(fields: [id_permiso], references: [id_permiso])
+
+  @@unique([id_usuario, id_permiso])
+  @@map("usuario_permiso")
+}
+
+model Auditoria {
+  id_auditoria      Int              @id @default(autoincrement())
+  tabla             String           @db.VarChar(50)
+  accion            AccionAuditoria
+  id_registro       Int
+  usuario_id        Int
+  fecha_cambio      DateTime         @default(now())
+  ip_address        String?          @db.VarChar(45)
+  user_agent        String?          @db.Text
+  datos_anteriores  Json?
+  datos_nuevos      Json?
+  observacion       String?          @db.Text
+
+  usuario Usuario @relation(fields: [usuario_id], references: [id_usuario])
+
+  @@index([tabla, id_registro], name: "idx_tabla_registro")
+  @@index([usuario_id, fecha_cambio], name: "idx_usuario_fecha")
+  @@index([fecha_cambio], name: "idx_fecha")
+  @@map("auditoria")
+}
+
+model Moneda {
+  id_moneda    Int     @id @default(autoincrement())
+  codigo       String  @db.Char(3)
+  nombre       String  @db.VarChar(50)
+  simbolo      String? @db.VarChar(10)
+  es_principal Boolean @default(false)
+
+  productos               Producto[]
+  compras                 Compra[]
+  tipos_cambio_origen     TipoCambio[]           @relation("MonedaOrigen")
+  tipos_cambio_destino    TipoCambio[]           @relation("MonedaDestino")
+  notas_credito           NotaCredito[]
+  inventarios_general     InventarioGeneral[]
+  inventarios_legal       InventarioLegal[]
+  facturas                Factura[]
+  pagos                   Pago[]
+
+  @@map("moneda")
+}
+
+model TipoCambio {
+  id_tipo_cambio     Int       @id @default(autoincrement())
+  moneda_origen_id   Int
+  moneda_destino_id  Int
+  tasa               Decimal   @db.Decimal(18, 8)
+  fecha_vigencia     DateTime  @db.Date
+  fecha_fin          DateTime? @db.Date
+  hora_actualizacion DateTime? @db.Time
+  tipo               TipoTasa
+  fuente             String?   @db.VarChar(50)
+  variacion_diaria   Decimal?  @db.Decimal(10, 4)
+
+  moneda_origen  Moneda @relation("MonedaOrigen", fields: [moneda_origen_id], references: [id_moneda])
+  moneda_destino Moneda @relation("MonedaDestino", fields: [moneda_destino_id], references: [id_moneda])
+
+  @@unique([moneda_origen_id, fecha_vigencia])
+  @@index([fecha_vigencia], name: "idx_historial")
+  @@map("tipo_cambio")
+}
+
+model Proveedor {
+  id_proveedor  Int     @id @default(autoincrement())
+  nombre        String  @db.VarChar(100)
+  ruc           String? @db.VarChar(20)
+  telefono      String? @db.VarChar(15)
+  email         String? @db.VarChar(100)
+  direccion     String? @db.Text
+  terminos_pago String? @db.VarChar(50)
+  activo        Boolean @default(true)
+
+  compras  Compra[]
+  facturas Factura[]
+
+  @@map("proveedor")
+}
+
+model Producto {
+  id_producto      Int      @id @default(autoincrement())
+  codigo_barra     String?  @unique @db.VarChar(50)
+  nombre           String   @db.VarChar(100)
+  descripcion      String?  @db.Text
+  categoria        String?  @db.VarChar(50)
+  unidad_medida    String?  @db.VarChar(20)
+  id_moneda_precio Int?
+  peso_unitario    Decimal? @db.Decimal(8, 3)
+  activo           Boolean  @default(true)
+
+  moneda              Moneda?                @relation(fields: [id_moneda_precio], references: [id_moneda])
+  detalles_compra     DetalleCompra[]
+  notas_credito       NotaCredito[]
+  movimientos         MovimientoInventario[]
+  inventario_general  InventarioGeneral?
+  inventario_legal    InventarioLegal?
+
+  @@map("producto")
+}
+
+model Compra {
+  id_compra          Int            @id @default(autoincrement())
+  id_proveedor       Int
+  fecha_compra       DateTime       @default(now())
+  numero_factura     String?        @db.VarChar(50)
+  subtotal           Decimal?       @db.Decimal(12, 2)
+  id_moneda_subtotal Int?
+  tasa_referencia    Decimal?       @db.Decimal(18, 8)
+  base_imponible     Decimal?       @db.Decimal(12, 2)
+  alicuota_iva       Decimal?       @default(16.00) @db.Decimal(5, 2)
+  monto_iva          Decimal?       @db.Decimal(12, 2)
+  total              Decimal        @db.Decimal(12, 2)
+  reportable_seniat  Boolean        @default(false)
+  estado             EstadoCompra   @default(pendiente)
+
+  proveedor     Proveedor       @relation(fields: [id_proveedor], references: [id_proveedor])
+  moneda        Moneda?         @relation(fields: [id_moneda_subtotal], references: [id_moneda])
+  detalles      DetalleCompra[]
+  notas_credito NotaCredito[]
+  facturas      Factura[]
+
+  @@index([reportable_seniat, estado], name: "idx_seniat")
+  @@index([id_proveedor], name: "idx_proveedor")
+  @@map("compra")
+}
+
+model DetalleCompra {
+  id_detalle       Int     @id @default(autoincrement())
+  id_compra        Int
+  id_producto      Int
+  cantidad         Decimal @db.Decimal(10, 3)
+  precio_unitario  Decimal @db.Decimal(10, 2)
+  subtotal_linea   Decimal @db.Decimal(12, 2)
+
+  compra        Compra        @relation(fields: [id_compra], references: [id_compra])
+  producto      Producto      @relation(fields: [id_producto], references: [id_producto])
+  notas_credito NotaCredito[]
+
+  @@map("detalle_compra")
+}
+
+model NotaCredito {
+  id_nota_credito   Int      @id @default(autoincrement())
+  id_compra         Int
+  id_detalle_compra Int
+  id_producto       Int
+  cantidad          Decimal  @db.Decimal(10, 3)
+  valor_unitario    Decimal? @db.Decimal(10, 2)
+  id_moneda         Int?
+  fecha             DateTime @db.Date
+  observacion       String?  @db.Text
+
+  compra         Compra        @relation(fields: [id_compra], references: [id_compra])
+  detalle_compra DetalleCompra @relation(fields: [id_detalle_compra], references: [id_detalle])
+  producto       Producto      @relation(fields: [id_producto], references: [id_producto])
+  moneda         Moneda?       @relation(fields: [id_moneda], references: [id_moneda])
+
+  @@map("nota_credito")
+}
+
+model MovimientoInventario {
+  id_movimiento    Int                  @id @default(autoincrement())
+  id_producto      Int
+  tipo_movimiento  TipoMovimiento
+  tipo_inventario  TipoInventario
+  cantidad         Decimal              @db.Decimal(10, 3)
+  cantidad_anterior Decimal             @db.Decimal(12, 3)
+  cantidad_nueva   Decimal              @db.Decimal(12, 3)
+  id_origen_tipo   String?              @db.VarChar(30)
+  id_origen        Int?
+  id_usuario       Int
+  fecha            DateTime             @default(now())
+  observacion      String?              @db.Text
+
+  producto Producto @relation(fields: [id_producto], references: [id_producto])
+  usuario  Usuario  @relation(fields: [id_usuario], references: [id_usuario])
+
+  @@map("movimiento_inventario")
+}
+
+model InventarioGeneral {
+  id_inventario_gen    Int      @id @default(autoincrement())
+  id_producto          Int      @unique
+  cantidad_actual      Decimal  @default(0) @db.Decimal(12, 3)
+  ubicacion            String?  @db.VarChar(50)
+  valor_unitario       Decimal? @db.Decimal(10, 2)
+  id_moneda_valor      Int?
+  fecha_actualizacion  DateTime @default(now())
+
+  producto Producto @relation(fields: [id_producto], references: [id_producto])
+  moneda   Moneda?  @relation(fields: [id_moneda_valor], references: [id_moneda])
+
+  @@map("inventario_general")
+}
+
+model InventarioLegal {
+  id_inventario_legal Int      @id @default(autoincrement())
+  id_producto         Int      @unique
+  cantidad_actual     Decimal  @default(0) @db.Decimal(12, 3)
+  valor_unitario      Decimal? @db.Decimal(10, 2)
+  id_moneda_valor     Int?
+  fecha_actualizacion DateTime @default(now())
+
+  producto Producto @relation(fields: [id_producto], references: [id_producto])
+  moneda   Moneda?  @relation(fields: [id_moneda_valor], references: [id_moneda])
+
+  @@map("inventario_legal")
+}
+
+model Factura {
+  id_factura         Int            @id @default(autoincrement())
+  id_proveedor       Int
+  id_compra          Int?
+  numero_factura     String         @unique @db.VarChar(50)
+  fecha_emision      DateTime       @db.Date
+  fecha_vencimiento  DateTime       @db.Date
+  base_imponible     Decimal        @db.Decimal(12, 2)
+  alicuota_iva       Decimal        @default(16.00) @db.Decimal(5, 2)
+  monto_iva          Decimal        @db.Decimal(12, 2)
+  monto_total        Decimal        @db.Decimal(12, 2)
+  id_moneda_monto    Int
+  tasa_referencia    Decimal?       @db.Decimal(18, 8)
+  estado             EstadoFactura  @default(pendiente)
+  eliminada          Boolean        @default(false)
+
+  proveedor Proveedor @relation(fields: [id_proveedor], references: [id_proveedor])
+  compra    Compra?   @relation(fields: [id_compra], references: [id_compra])
+  moneda    Moneda    @relation(fields: [id_moneda_monto], references: [id_moneda])
+  pagos     Pago[]
+
+  @@index([id_proveedor, eliminada], name: "idx_proveedor_factura")
+  @@index([fecha_vencimiento], name: "idx_vencimiento")
+  @@map("factura")
+}
+
+model Pago {
+  id_pago      Int         @id @default(autoincrement())
+  id_factura   Int
+  fecha_pago   DateTime    @default(now())
+  monto        Decimal     @db.Decimal(12, 2)
+  id_moneda    Int
+  tasa_pago    Decimal?    @db.Decimal(18, 8)
+  metodo_pago  MetodoPago
+  referencia   String?     @db.VarChar(100)
+
+  factura Factura @relation(fields: [id_factura], references: [id_factura])
+  moneda  Moneda  @relation(fields: [id_moneda], references: [id_moneda])
+
+  @@map("pago")
+}
+
+enum Rol {
+  admin
+  cajero
+  bodega
+}
+
+enum AccionAuditoria {
+  INSERT
+  UPDATE
+  DELETE
+}
+
+enum TipoTasa {
+  oficial
+  paralelo
+}
+
+enum EstadoCompra {
+  pendiente
+  recibida
+  cancelada
+}
+
+enum TipoMovimiento {
+  entrada
+  salida
+  ajuste
+  nota_credito
+}
+
+enum TipoInventario {
+  general
+  legal
+  ambos
+}
+
+enum EstadoFactura {
+  pendiente
+  parcial
+  pagada
+  vencida
+}
+
+enum MetodoPago {
+  efectivo
+  transferencia
+  cheque
+  zelle
+}
