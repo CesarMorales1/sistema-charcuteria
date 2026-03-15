@@ -24,16 +24,25 @@ export const authMiddleware = async (req, res, next) => {
   }
 };
 
-export const requirePermission = (permiso) => {
+export const requirePermission = (permisoId) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ error: 'No autenticado' });
     }
 
-    if (!req.user.permisos || !req.user.permisos.includes(permiso)) {
+    // El admin siempre tiene acceso total a todo el sistema
+    if (req.user.rol === 'admin') {
+      return next();
+    }
+
+    // Comparar por ID numérico (evita errores de tipeo con strings)
+    const idRequerido = Number(permisoId);
+    const tienePermiso = req.user.permisos && req.user.permisos.includes(idRequerido);
+
+    if (!tienePermiso) {
       return res.status(403).json({
         error: 'No tienes permiso para realizar esta acción',
-        permisoRequerido: permiso
+        permisoRequerido: idRequerido
       });
     }
 

@@ -12,6 +12,9 @@
     "prisma:studio": "prisma studio",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "keywords": [
     "clean-architecture",
     "ddd",
