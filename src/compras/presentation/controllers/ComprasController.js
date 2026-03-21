@@ -18,8 +18,8 @@ export class ComprasController {
 
   listar = async (req, res, next) => {
     try {
-      const { page = 1, limit = 20, id_proveedor, reportable_seniat, estado } = req.query;
-      const r = await this._listCompras.execute({ page: +page, limit: +limit, id_proveedor, reportable_seniat, estado });
+      const { page = 1, limit = 20, id_proveedor, reportable_seniat, estado, numero_factura, fecha_desde, fecha_hasta } = req.query;
+      const r = await this._listCompras.execute({ page: +page, limit: +limit, id_proveedor, reportable_seniat, estado, numero_factura, fecha_desde, fecha_hasta });
       res.json({ status: 'success', ...r });
     } catch (e) { next(e); }
   };

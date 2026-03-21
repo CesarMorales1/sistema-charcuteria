@@ -1,22 +1,26 @@
 export class CreateCompraUseCase {
   constructor(compraRepository) { this.r = compraRepository; }
   async execute(data, id_usuario) {
-    // Calcular subtotales y totales si no vienen calculados
+    // Calculate line subtotals
     const detalles = data.detalles.map(d => ({
       ...d,
       subtotal_linea: parseFloat(d.cantidad) * parseFloat(d.precio_unitario)
     }));
     const subtotal = detalles.reduce((acc, d) => acc + d.subtotal_linea, 0);
-    const alicuota = parseFloat(data.alicuota_iva ?? 16);
-    const base_imponible = data.reportable_seniat ? subtotal : null;
-    const monto_iva = data.reportable_seniat ? (subtotal * alicuota / 100) : null;
-    const total = subtotal + (monto_iva ?? 0);
+
+    // Trust the frontend-calculated IVA values (computed per-line with aplicar_iva flag).
+    // Only fall back to recalculation when values are not provided.
+    const monto_iva      = data.monto_iva      != null ? parseFloat(data.monto_iva)      : 0;
+    const alicuota_iva   = data.alicuota_iva   != null ? parseFloat(data.alicuota_iva)   : 0;
+    const base_imponible = data.base_imponible  != null ? parseFloat(data.base_imponible) : subtotal;
+    const total          = subtotal + monto_iva;
 
     return this.r.save({
       ...data,
       detalles,
       subtotal,
       base_imponible,
+      alicuota_iva,
       monto_iva,
       total,
       id_usuario,

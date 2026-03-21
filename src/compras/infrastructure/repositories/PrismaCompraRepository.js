@@ -133,7 +133,7 @@ export class PrismaCompraRepository extends CompraRepository {
     };
 
     if (tipo_inventario === 'general' || tipo_inventario === 'ambos') await ajustar('inventarioGeneral', 'id_producto', 'general');
-    if (tipo_inventario === 'legal'   || tipo_inventario === 'ambos') await ajustar('inventarioLegal',   'id_producto', 'legal');
+    if (tipo_inventario === 'legal' || tipo_inventario === 'ambos') await ajustar('inventarioLegal', 'id_producto', 'legal');
   }
 
   async findById(id) {

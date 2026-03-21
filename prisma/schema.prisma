@@ -19,6 +19,7 @@ model Usuario {
   permisos  UsuarioPermiso[]
   auditorias Auditoria[]
   movimientos MovimientoInventario[]
+  ventas    Venta[]
 
   @@map("usuario")
 }
@@ -83,6 +84,7 @@ model Moneda {
   inventarios_legal       InventarioLegal[]
   facturas                Factura[]
   pagos                   Pago[]
+  ventas                  Venta[]
 
   @@map("moneda")
 }
@@ -123,23 +125,49 @@ model Proveedor {
   @@map("proveedor")
 }
 
+model CategoriaProducto {
+  id_categoria Int     @id @default(autoincrement())
+  nombre       String  @unique @db.VarChar(50)
+  descripcion  String? @db.Text
+  activo       Boolean @default(true)
+
+  productos Producto[]
+
+  @@map("categoria_producto")
+}
+
+model UnidadMedida {
+  id_unidad_medida Int     @id @default(autoincrement())
+  nombre           String  @unique @db.VarChar(50)
+  abreviatura      String  @unique @db.VarChar(10)
+  activo           Boolean @default(true)
+
+  productos Producto[]
+
+  @@map("unidad_medida")
+}
+
 model Producto {
   id_producto      Int      @id @default(autoincrement())
   codigo_barra     String?  @unique @db.VarChar(50)
   nombre           String   @db.VarChar(100)
   descripcion      String?  @db.Text
-  categoria        String?  @db.VarChar(50)
-  unidad_medida    String?  @db.VarChar(20)
+  id_categoria     Int
+  id_unidad_medida Int
   id_moneda_precio Int?
+  precio_base      Decimal? @default(0) @db.Decimal(12, 2)
   peso_unitario    Decimal? @db.Decimal(8, 3)
   activo           Boolean  @default(true)
 
+  categoria           CategoriaProducto      @relation(fields: [id_categoria], references: [id_categoria])
+  unidad_medida       UnidadMedida           @relation(fields: [id_unidad_medida], references: [id_unidad_medida])
   moneda              Moneda?                @relation(fields: [id_moneda_precio], references: [id_moneda])
   detalles_compra     DetalleCompra[]
   notas_credito       NotaCredito[]
   movimientos         MovimientoInventario[]
   inventario_general  InventarioGeneral?
   inventario_legal    InventarioLegal?
+  detalles_venta      DetalleVenta[]
 
   @@map("producto")
 }
@@ -295,6 +323,43 @@ model Pago {
   @@map("pago")
 }
 
+model Venta {
+  id_venta          Int         @id @default(autoincrement())
+  fecha_venta       DateTime    @default(now())
+  subtotal          Decimal     @db.Decimal(12, 2)
+  alicuota_iva      Decimal     @default(16.00) @db.Decimal(5, 2)
+  monto_iva         Decimal?    @db.Decimal(12, 2)
+  total             Decimal     @db.Decimal(12, 2)
+  id_moneda         Int?
+  tasa_referencia   Decimal?    @db.Decimal(18, 8)
+  reportable_seniat Boolean     @default(false)
+  estado            EstadoVenta @default(abierta)
+  observacion       String?     @db.Text
+  id_usuario        Int
+
+  moneda   Moneda?       @relation(fields: [id_moneda],   references: [id_moneda])
+  usuario  Usuario       @relation(fields: [id_usuario],  references: [id_usuario])
+  detalles DetalleVenta[]
+
+  @@index([fecha_venta], name: "idx_venta_fecha")
+  @@index([estado],      name: "idx_venta_estado")
+  @@map("venta")
+}
+
+model DetalleVenta {
+  id_detalle      Int     @id @default(autoincrement())
+  id_venta        Int
+  id_producto     Int
+  cantidad        Decimal @db.Decimal(10, 3)
+  precio_unitario Decimal @db.Decimal(10, 2)
+  subtotal_linea  Decimal @db.Decimal(12, 2)
+
+  venta    Venta   @relation(fields: [id_venta],   references: [id_venta])
+  producto Producto @relation(fields: [id_producto], references: [id_producto])
+
+  @@map("detalle_venta")
+}
+
 enum Rol {
   admin
   cajero
@@ -343,4 +408,10 @@ enum MetodoPago {
   transferencia
   cheque
   zelle
+}
+
+enum EstadoVenta {
+  abierta
+  cerrada
+  anulada
 }

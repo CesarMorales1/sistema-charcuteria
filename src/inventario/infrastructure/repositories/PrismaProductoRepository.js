@@ -1,5 +1,13 @@
 import { ProductoRepository } from '../../domain/repositories/ProductoRepository.js';
 import { Producto } from '../../domain/entities/Producto.js';
+import { Prisma } from '@prisma/client';
+
+const INCLUDE_PRODUCTO = {
+  categoria: true,
+  unidad_medida: true,
+  inventario_general: true,
+  inventario_legal: true,
+};
 
 export class PrismaProductoRepository extends ProductoRepository {
   constructor(prismaClient) {
@@ -7,16 +15,19 @@ export class PrismaProductoRepository extends ProductoRepository {
     this.prisma = prismaClient;
   }
 
-  _toDomain(p, opts = {}) {
+  _toDomain(p) {
     if (!p) return null;
     return new Producto({
       id_producto: p.id_producto,
       codigo_barra: p.codigo_barra,
       nombre: p.nombre,
       descripcion: p.descripcion,
-      categoria: p.categoria,
-      unidad_medida: p.unidad_medida,
+      id_categoria: p.id_categoria,
+      categoria: p.categoria ?? null,
+      id_unidad_medida: p.id_unidad_medida,
+      unidad_medida: p.unidad_medida ?? null,
       id_moneda_precio: p.id_moneda_precio,
+      precio_base: p.precio_base,
       peso_unitario: p.peso_unitario,
       activo: p.activo,
       inventario_general: p.inventario_general ?? null,
@@ -25,65 +36,131 @@ export class PrismaProductoRepository extends ProductoRepository {
   }
 
   async save(producto) {
-    const created = await this.prisma.$transaction(async (tx) => {
-      const prod = await tx.producto.create({
-        data: {
-          codigo_barra: producto.codigo_barra,
-          nombre: producto.nombre,
-          descripcion: producto.descripcion,
-          categoria: producto.categoria,
-          unidad_medida: producto.unidad_medida,
-          id_moneda_precio: producto.id_moneda_precio,
-          peso_unitario: producto.peso_unitario,
-          activo: true,
-        }
+    const idCategoria = parseInt(producto.id_categoria);
+    const idUnidad = parseInt(producto.id_unidad_medida);
+
+    if (!Number.isInteger(idCategoria) || idCategoria < 1) {
+      throw new Error('id_categoria es requerido y debe ser un número entero válido');
+    }
+    if (!Number.isInteger(idUnidad) || idUnidad < 1) {
+      throw new Error('id_unidad_medida es requerido y debe ser un número entero válido');
+    }
+
+    if (!producto.codigo_barra) {
+      throw new Error('El código de barras es requerido');
+    }
+
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        const prod = await tx.producto.create({
+          data: {
+            codigo_barra: String(producto.codigo_barra).trim(),
+            nombre: producto.nombre,
+            descripcion: producto.descripcion ?? null,
+            id_categoria: idCategoria,
+            id_unidad_medida: idUnidad,
+            id_moneda_precio: producto.id_moneda_precio,
+            precio_base: producto.precio_base,
+            peso_unitario: producto.peso_unitario ?? null,
+            activo: true,
+          }
+        });
+        await tx.inventarioGeneral.create({
+          data: { id_producto: prod.id_producto, cantidad_actual: 0 }
+        });
+        await tx.inventarioLegal.create({
+          data: { id_producto: prod.id_producto, cantidad_actual: 0 }
+        });
+        return prod;
       });
-      // Inicializar ambos inventarios en 0
-      await tx.inventarioGeneral.create({
-        data: { id_producto: prod.id_producto, cantidad_actual: 0 }
-      });
-      await tx.inventarioLegal.create({
-        data: { id_producto: prod.id_producto, cantidad_actual: 0 }
-      });
-      return prod;
-    });
-    return this.findById(created.id_producto);
+      return this.findById(created.id_producto);
+    } catch (error) {
+      if (error.code === 'P2002' && error.meta?.target?.includes('codigo_barra')) {
+        throw new Error('El código de barras ya existe en el sistema');
+      }
+      throw error;
+    }
   }
 
   async findById(id) {
     const p = await this.prisma.producto.findUnique({
       where: { id_producto: parseInt(id) },
-      include: { inventario_general: true, inventario_legal: true }
+      include: INCLUDE_PRODUCTO,
     });
     return this._toDomain(p);
   }
 
-  async findAll({ page = 1, limit = 20, search = '', categoria = '' } = {}) {
+  async findAll({ page = 1, limit = 20, search = '', id_categoria = null, soloActivos = true, stock_bajo = false, diferencias = false } = {}) {
     const skip = (page - 1) * limit;
     const where = {
-      activo: true,
+      ...(soloActivos !== false ? { activo: true } : {}),
       ...(search ? {
         OR: [
           { nombre: { contains: search, mode: 'insensitive' } },
           { codigo_barra: { contains: search, mode: 'insensitive' } },
         ]
       } : {}),
-      ...(categoria ? { categoria } : {})
+      ...(id_categoria ? { id_categoria: parseInt(id_categoria) } : {}),
     };
 
-    const [productos, total] = await this.prisma.$transaction([
+    // Filtro por stock bajo
+    if (stock_bajo === 'true' || stock_bajo === true) {
+      where.inventario_general = { cantidad_actual: { lt: 5 } };
+    }
+
+    // Filtro por diferencias (requiere lógica especial en Prisma)
+    if (diferencias === 'true' || diferencias === true) {
+      const diffIds = await this.prisma.$queryRaw`
+        SELECT g.id_producto 
+        FROM inventario_general g
+        JOIN inventario_legal l ON g.id_producto = l.id_producto
+        WHERE g.cantidad_actual <> l.cantidad_actual
+      `;
+      where.id_producto = { in: diffIds.map(row => row.id_producto) };
+    }
+
+    // Estadísticas globales (basadas en el filtro base 'where' sin los filtros de stock/diff específicos)
+    const baseWhere = {
+      ...(soloActivos !== false ? { activo: true } : {}),
+      ...(search ? {
+        OR: [
+          { nombre: { contains: search, mode: 'insensitive' } },
+          { codigo_barra: { contains: search, mode: 'insensitive' } },
+        ]
+      } : {}),
+      ...(id_categoria ? { id_categoria: parseInt(id_categoria) } : {}),
+    };
+
+    const [productos, total, totalStockBajo, rawDiffCount] = await this.prisma.$transaction([
       this.prisma.producto.findMany({
         where, skip, take: limit,
         orderBy: { nombre: 'asc' },
-        include: { inventario_general: true, inventario_legal: true }
+        include: INCLUDE_PRODUCTO,
       }),
-      this.prisma.producto.count({ where })
+      this.prisma.producto.count({ where }),
+      this.prisma.producto.count({
+        where: { ...baseWhere, inventario_general: { cantidad_actual: { lt: 5 } } }
+      }),
+      this.prisma.$queryRaw`
+        SELECT COUNT(g.id_producto)::int as count
+        FROM inventario_general g
+        JOIN inventario_legal l ON g.id_producto = l.id_producto
+        JOIN producto p ON g.id_producto = p.id_producto
+        WHERE g.cantidad_actual <> l.cantidad_actual
+        AND p.activo = true
+        ${id_categoria ? Prisma.sql`AND p.id_categoria = ${parseInt(id_categoria)}` : Prisma.empty}
+        ${search ? Prisma.sql`AND (p.nombre ILIKE ${'%' + search + '%'} OR p.codigo_barra ILIKE ${'%' + search + '%'})` : Prisma.empty}
+      `
     ]);
 
     return {
       data: productos.map(p => this._toDomain(p)),
       total, page,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
+      stats: {
+        totalStockBajo,
+        totalDiferencias: rawDiffCount[0]?.count || 0
+      }
     };
   }
 
@@ -91,16 +168,16 @@ export class PrismaProductoRepository extends ProductoRepository {
     const updated = await this.prisma.producto.update({
       where: { id_producto: producto.id_producto },
       data: {
-        codigo_barra: producto.codigo_barra,
-        nombre: producto.nombre,
-        descripcion: producto.descripcion,
-        categoria: producto.categoria,
-        unidad_medida: producto.unidad_medida,
-        id_moneda_precio: producto.id_moneda_precio,
-        peso_unitario: producto.peso_unitario,
-        activo: producto.activo,
+        ...(producto.codigo_barra !== undefined && { codigo_barra: producto.codigo_barra }),
+        ...(producto.nombre !== undefined && { nombre: producto.nombre }),
+        ...(producto.descripcion !== undefined && { descripcion: producto.descripcion }),
+        ...(producto.id_categoria !== undefined && { id_categoria: parseInt(producto.id_categoria) }),
+        ...(producto.id_unidad_medida !== undefined && { id_unidad_medida: parseInt(producto.id_unidad_medida) }),
+        ...(producto.id_moneda_precio !== undefined && { id_moneda_precio: producto.id_moneda_precio ? parseInt(producto.id_moneda_precio) : null }),
+        ...(producto.peso_unitario !== undefined && { peso_unitario: producto.peso_unitario }),
+        ...(producto.activo !== undefined && { activo: producto.activo }),
       },
-      include: { inventario_general: true, inventario_legal: true }
+      include: INCLUDE_PRODUCTO,
     });
     return this._toDomain(updated);
   }
@@ -112,11 +189,6 @@ export class PrismaProductoRepository extends ProductoRepository {
     });
   }
 
-  /**
-   * Ajusta inventario y registra el movimiento en una transacción atómica.
-   * tipo_inventario: 'general' | 'legal' | 'ambos'
-   * tipo_movimiento: 'entrada' | 'salida' | 'ajuste' | 'nota_credito'
-   */
   async ajustarInventario({ id_producto, tipo_inventario, cantidad, tipo_movimiento, id_usuario, observacion = null, id_origen = null, id_origen_tipo = null }) {
     const prodId = parseInt(id_producto);
     const cant = parseFloat(cantidad);

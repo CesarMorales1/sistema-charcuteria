@@ -12,8 +12,8 @@ import { UpdateUsuarioUseCase } from './usuarios/application/use-cases/UpdateUsu
 import { DeleteUsuarioUseCase } from './usuarios/application/use-cases/DeleteUsuarioUseCase.js';
 import { AssignPermissionsUseCase } from './usuarios/application/use-cases/AssignPermissionsUseCase.js';
 import { LoginUseCase } from './usuarios/application/use-cases/LoginUseCase.js';
-import { UsuarioController } from './usuarios/presentation/controllers/UsuarioController.js';
-import { AuthController } from './usuarios/presentation/controllers/AuthController.js';
+import { UsuarioController } from './usuarios/presentation/controllers/usuarioController.js';
+import { AuthController } from './usuarios/presentation/controllers/authController.js';
 import { createUsuarioRoutes } from './usuarios/presentation/routes/usuarioRoutes.js';
 import { createAuthRoutes } from './usuarios/presentation/routes/authRoutes.js';
 
@@ -33,7 +33,7 @@ import { ListProveedoresUseCase } from './compras/application/use-cases/ListProv
 import { GetProveedorUseCase } from './compras/application/use-cases/GetProveedorUseCase.js';
 import { UpdateProveedorUseCase } from './compras/application/use-cases/UpdateProveedorUseCase.js';
 import { DeleteProveedorUseCase } from './compras/application/use-cases/DeleteProveedorUseCase.js';
-import { ProveedorController } from './compras/presentation/controllers/ProveedorController.js';
+import { ProveedorController } from './compras/presentation/controllers/proveedorController.js';
 import { createProveedorRoutes } from './compras/presentation/routes/proveedorRoutes.js';
 
 // ── Módulo de Compras ──────────────────────────────────────────
@@ -44,8 +44,37 @@ import { createComprasRoutes } from './compras/presentation/routes/comprasRoutes
 
 // ── Módulo de Inventario ───────────────────────────────────────
 import { PrismaProductoRepository } from './inventario/infrastructure/repositories/PrismaProductoRepository.js';
-import { CreateProductoUseCase, ListProductosUseCase, GetProductoUseCase, UpdateProductoUseCase, DeleteProductoUseCase, AjustarInventarioUseCase, ListMovimientosUseCase, GetInventarioUseCase } from './inventario/application/use-cases/inventarioUseCases.js';
-import { InventarioController } from './inventario/presentation/controllers/InventarioController.js';
+import { PrismaCategoriaRepository } from './inventario/infrastructure/repositories/PrismaCategoriaRepository.js';
+import { PrismaUnidadMedidaRepository } from './inventario/infrastructure/repositories/PrismaUnidadMedidaRepository.js';
+
+import {
+  CreateProductoUseCase,
+  ListProductosUseCase,
+  GetProductoUseCase,
+  UpdateProductoUseCase,
+  DeleteProductoUseCase,
+  AjustarInventarioUseCase,
+  ListMovimientosUseCase,
+  GetInventarioUseCase
+} from './inventario/application/use-cases/inventarioUseCases.js';
+
+import {
+  ListarCategoriasUseCase,
+  GetCategoriaUseCase,
+  CrearCategoriaUseCase,
+  ActualizarCategoriaUseCase,
+  EliminarCategoriaUseCase
+} from './inventario/application/use-cases/categoriaUseCases.js';
+
+import {
+  ListarUnidadesMedidaUseCase,
+  GetUnidadMedidaUseCase,
+  CrearUnidadMedidaUseCase,
+  ActualizarUnidadMedidaUseCase,
+  EliminarUnidadMedidaUseCase
+} from './inventario/application/use-cases/unidadMedidaUseCases.js';
+
+import { InventarioController } from './inventario/presentation/controllers/inventarioController.js';
 import { createInventarioRoutes } from './inventario/presentation/routes/inventarioRoutes.js';
 
 // ── Módulo de TASAS ───────────────────────────────────────────
@@ -61,7 +90,13 @@ import { CreateFacturaUseCase, ListFacturasUseCase, GetFacturaUseCase, DeleteFac
 import { CuentasPorPagarController } from './cuentas_por_pagar/presentation/controllers/CuentasPorPagarController.js';
 import { createCuentasPorPagarRoutes } from './cuentas_por_pagar/presentation/routes/cuentasPorPagarRoutes.js';
 
-const PORT = process.env.PORT || 3000;
+// ── Módulo de Ventas ───────────────────────────────────────────
+import { PrismaVentaRepository } from './ventas/infrastructure/repositories/PrismaVentaRepository.js';
+import { CreateVentaUseCase, ListVentasUseCase, GetVentaUseCase, AnularVentaUseCase } from './ventas/application/use-cases/ventasUseCases.js';
+import { VentasController } from './ventas/presentation/controllers/VentasController.js';
+import { createVentasRoutes } from './ventas/presentation/routes/ventasRoutes.js';
+
+const PORT = process.env.PORT || 5000;
 
 const setupDependencies = () => {
   const prisma = getPrismaClient();
@@ -109,7 +144,11 @@ const setupDependencies = () => {
 
   // Inventario
   const productoRepository = new PrismaProductoRepository(prisma);
+  const categoriaRepository = new PrismaCategoriaRepository(prisma);
+  const unidadMedidaRepository = new PrismaUnidadMedidaRepository(prisma);
+
   const inventarioController = new InventarioController({
+    // Productos
     createProducto:   new CreateProductoUseCase(productoRepository),
     listProductos:    new ListProductosUseCase(productoRepository),
     getProducto:      new GetProductoUseCase(productoRepository),
@@ -118,6 +157,20 @@ const setupDependencies = () => {
     ajustarInventario: new AjustarInventarioUseCase(productoRepository),
     listMovimientos:  new ListMovimientosUseCase(productoRepository),
     getInventario:    new GetInventarioUseCase(productoRepository),
+
+    // Categorías
+    listCategorias:   new ListarCategoriasUseCase(categoriaRepository),
+    getCategoria:     new GetCategoriaUseCase(categoriaRepository),
+    createCategoria:  new CrearCategoriaUseCase(categoriaRepository),
+    updateCategoria:  new ActualizarCategoriaUseCase(categoriaRepository),
+    deleteCategoria:  new EliminarCategoriaUseCase(categoriaRepository),
+
+    // Unidades
+    listUnidades:     new ListarUnidadesMedidaUseCase(unidadMedidaRepository),
+    getUnidad:        new GetUnidadMedidaUseCase(unidadMedidaRepository),
+    createUnidad:     new CrearUnidadMedidaUseCase(unidadMedidaRepository),
+    updateUnidad:     new ActualizarUnidadMedidaUseCase(unidadMedidaRepository),
+    deleteUnidad:     new EliminarUnidadMedidaUseCase(unidadMedidaRepository),
   });
 
   // Tasas de Cambio
@@ -142,6 +195,15 @@ const setupDependencies = () => {
     saldoPendiente: new SaldoPendienteUseCase(facturaRepository, pagoRepository),
   });
 
+  // Ventas
+  const ventaRepository = new PrismaVentaRepository(prisma);
+  const ventasController = new VentasController({
+    createVenta:  new CreateVentaUseCase(ventaRepository),
+    listVentas:   new ListVentasUseCase(ventaRepository),
+    getVenta:     new GetVentaUseCase(ventaRepository),
+    anularVenta:  new AnularVentaUseCase(ventaRepository),
+  });
+
   return {
     prisma,
     usuarioController,
@@ -152,6 +214,7 @@ const setupDependencies = () => {
     comprasController,
     inventarioController,
     cuentasPorPagarController,
+    ventasController,
   };
 };
 
@@ -166,6 +229,7 @@ const setupRoutes = (dependencies) => {
   router.use('/inventario',       createInventarioRoutes(dependencies.inventarioController));
   router.use('/facturas',         createCuentasPorPagarRoutes(dependencies.cuentasPorPagarController));
   router.use('/tasas',            createTasasRoutes(dependencies.tasasController));
+  router.use('/ventas',           createVentasRoutes(dependencies.ventasController));
 
   return router;
 };
@@ -185,7 +249,7 @@ const startServer = async () => {
       console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
       console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📡 Health check: http://localhost:${PORT}/health`);
-      console.log('📦 Módulos activos: auth, usuarios, permisos, proveedores, compras, inventario, facturas');
+      console.log('📦 Módulos activos: auth, usuarios, permisos, proveedores, compras, inventario, facturas, tasas, ventas');
     });
 
     const gracefulShutdown = async (signal) => {
