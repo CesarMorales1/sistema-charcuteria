@@ -44,6 +44,40 @@ async function main() {
     });
   }
 
+  // 1.1 Crear categorías base
+  const categoriasData = [
+    { nombre: 'Víveres', descripcion: 'Productos de consumo general' },
+    { nombre: 'Lácteos', descripcion: 'Leche, quesos y derivados' },
+    { nombre: 'Charcutería', descripcion: 'Embutidos y carnes frías' },
+  ];
+
+  console.log('Creando categorías base...');
+  for (const c of categoriasData) {
+    const existe = await prisma.categoriaProducto.findFirst({ where: { nombre: c.nombre } });
+    if (!existe) {
+      await prisma.categoriaProducto.create({ data: c });
+      console.log(`  ✅ Categoría ${c.nombre} creada`);
+    }
+  }
+
+  // 1.2 Crear unidades de medida base
+  const unidadesData = [
+    { nombre: 'Kilogramos', abreviatura: 'Kg' },
+    { nombre: 'Gramos', abreviatura: 'g' },
+    { nombre: 'Unidades', abreviatura: 'Und' },
+    { nombre: 'Litros', abreviatura: 'L' },
+    { nombre: 'Mililitros', abreviatura: 'ml' },
+  ];
+
+  console.log('Creando unidades de medida base...');
+  for (const u of unidadesData) {
+    const existe = await prisma.unidadMedida.findFirst({ where: { nombre: u.nombre } });
+    if (!existe) {
+      await prisma.unidadMedida.create({ data: u });
+      console.log(`  ✅ Unidad ${u.nombre} creada`);
+    }
+  }
+
   // 2. Crear Superusuario (Admin)
   const adminEmail = 'admin@charcuteria.com';
   const plainPassword = 'admin'; // El admin deberá cambiar su contraseña luego.

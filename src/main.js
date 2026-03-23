@@ -77,6 +77,9 @@ import {
 import { InventarioController } from './inventario/presentation/controllers/inventarioController.js';
 import { createInventarioRoutes } from './inventario/presentation/routes/inventarioRoutes.js';
 
+import { InicializacionController } from './inventario/presentation/controllers/InicializacionController.js';
+import { createInicializacionRoutes } from './inventario/presentation/routes/inicializacionRoutes.js';
+
 // ── Módulo de TASAS ───────────────────────────────────────────
 import { PrismaTipoCambioRepository } from './tasas/infrastructure/repositories/PrismaTipoCambioRepository.js';
 import { RegistrarTasaUseCase, GetTasaVigenteUseCase, GetHistorialTasasUseCase, GetTasaPorFechaUseCase } from './tasas/application/use-cases/tasasUseCases.js';
@@ -147,6 +150,8 @@ const setupDependencies = () => {
   const categoriaRepository = new PrismaCategoriaRepository(prisma);
   const unidadMedidaRepository = new PrismaUnidadMedidaRepository(prisma);
 
+  const inicializacionController = new InicializacionController(productoRepository);
+
   const inventarioController = new InventarioController({
     // Productos
     createProducto:   new CreateProductoUseCase(productoRepository),
@@ -213,6 +218,7 @@ const setupDependencies = () => {
     tasasController,
     comprasController,
     inventarioController,
+    inicializacionController,
     cuentasPorPagarController,
     ventasController,
   };
@@ -226,6 +232,7 @@ const setupRoutes = (dependencies) => {
   router.use('/permisos',         createPermisoRoutes(dependencies.permisoController));
   router.use('/proveedores',      createProveedorRoutes(dependencies.proveedorController));
   router.use('/compras',          createComprasRoutes(dependencies.comprasController));
+  router.use('/inventario/inicializacion', createInicializacionRoutes(dependencies.inicializacionController));
   router.use('/inventario',       createInventarioRoutes(dependencies.inventarioController));
   router.use('/facturas',         createCuentasPorPagarRoutes(dependencies.cuentasPorPagarController));
   router.use('/tasas',            createTasasRoutes(dependencies.tasasController));

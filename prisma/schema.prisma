@@ -388,6 +388,7 @@ enum TipoMovimiento {
   salida
   ajuste
   nota_credito
+  inicializacion
 }
 
 enum TipoInventario {
@@ -414,4 +415,14 @@ enum EstadoVenta {
   abierta
   cerrada
   anulada
+}
+
+model Configuracion {
+  clave       String   @id @db.VarChar(50)
+  valor       String   @db.Text
+  descripcion String?  @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("configuracion")
 }

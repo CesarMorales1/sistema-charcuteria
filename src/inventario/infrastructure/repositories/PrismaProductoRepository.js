@@ -259,4 +259,83 @@ export class PrismaProductoRepository extends ProductoRepository {
     ]);
     return { data: movimientos, total, page, totalPages: Math.ceil(total / limit) };
   }
+  async inicializarInventario(productos, id_usuario) {
+    const config = await this.prisma.configuracion.findUnique({
+      where: { clave: 'inventario_inicializado' }
+    });
+
+    if (config && config.valor === 'true') {
+      throw new Error('El inventario ya ha sido inicializado. Usa ajustes para modificaciones posteriores.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const prod of productos) {
+        const prodId = parseInt(prod.id_producto);
+        const cant = parseFloat(prod.cantidad);
+        const valorUnitario = prod.valor_unitario ? parseFloat(prod.valor_unitario) : null;
+
+        await tx.inventarioGeneral.update({
+          where: { id_producto: prodId },
+          data: { 
+            cantidad_actual: cant, 
+            valor_unitario: valorUnitario,
+            fecha_actualizacion: new Date() 
+          }
+        });
+
+        await tx.inventarioLegal.update({
+          where: { id_producto: prodId },
+          data: { 
+            cantidad_actual: cant, 
+            valor_unitario: valorUnitario,
+            fecha_actualizacion: new Date() 
+          }
+        });
+
+        if (cant > 0) {
+          await tx.movimientoInventario.createMany({
+            data: [
+              {
+                id_producto: prodId,
+                tipo_movimiento: 'inicializacion',
+                tipo_inventario: 'general',
+                cantidad: cant,
+                cantidad_anterior: 0,
+                cantidad_nueva: cant,
+                id_usuario: parseInt(id_usuario),
+                observacion: 'Carga inicial de inventario'
+              },
+              {
+                id_producto: prodId,
+                tipo_movimiento: 'inicializacion',
+                tipo_inventario: 'legal',
+                cantidad: cant,
+                cantidad_anterior: 0,
+                cantidad_nueva: cant,
+                id_usuario: parseInt(id_usuario),
+                observacion: 'Carga inicial de inventario'
+              }
+            ]
+          });
+        }
+      }
+
+      await tx.configuracion.upsert({
+        where: { clave: 'inventario_inicializado' },
+        create: {
+          clave: 'inventario_inicializado',
+          valor: 'true',
+          descripcion: 'Indica si el inventario inicial ya fue configurado'
+        },
+        update: { valor: 'true' }
+      });
+    });
+  }
+
+  async isInventarioInicializado() {
+    const config = await this.prisma.configuracion.findUnique({
+      where: { clave: 'inventario_inicializado' }
+    });
+    return config?.valor === 'true';
+  }
 }
