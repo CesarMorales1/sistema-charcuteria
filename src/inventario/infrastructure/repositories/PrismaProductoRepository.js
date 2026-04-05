@@ -276,19 +276,19 @@ export class PrismaProductoRepository extends ProductoRepository {
 
         await tx.inventarioGeneral.update({
           where: { id_producto: prodId },
-          data: { 
-            cantidad_actual: cant, 
+          data: {
+            cantidad_actual: cant,
             valor_unitario: valorUnitario,
-            fecha_actualizacion: new Date() 
+            fecha_actualizacion: new Date()
           }
         });
 
         await tx.inventarioLegal.update({
           where: { id_producto: prodId },
-          data: { 
-            cantidad_actual: cant, 
+          data: {
+            cantidad_actual: cant,
             valor_unitario: valorUnitario,
-            fecha_actualizacion: new Date() 
+            fecha_actualizacion: new Date()
           }
         });
 

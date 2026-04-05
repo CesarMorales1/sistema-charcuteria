@@ -1,8 +1,8 @@
 export class Producto {
   constructor({
     id_producto, codigo_barra, nombre, descripcion,
-    id_categoria, categoria, 
-    id_unidad_medida, unidad_medida, 
+    id_categoria, categoria,
+    id_unidad_medida, unidad_medida,
     id_moneda_precio,
     precio_base,
     peso_unitario, activo,
