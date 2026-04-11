@@ -177,6 +177,7 @@ model Compra {
   id_proveedor       Int
   fecha_compra       DateTime       @default(now())
   numero_factura     String?        @db.VarChar(50)
+  numero_control     String?        @db.VarChar(50)
   subtotal           Decimal?       @db.Decimal(12, 2)
   id_moneda_subtotal Int?
   tasa_referencia    Decimal?       @db.Decimal(18, 8)

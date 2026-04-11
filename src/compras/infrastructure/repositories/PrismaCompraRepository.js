@@ -14,6 +14,7 @@ export class PrismaCompraRepository extends CompraRepository {
       id_proveedor: c.id_proveedor,
       fecha_compra: c.fecha_compra,
       numero_factura: c.numero_factura,
+      numero_control: c.numero_control,
       subtotal: c.subtotal,
       id_moneda_subtotal: c.id_moneda_subtotal,
       tasa_referencia: c.tasa_referencia,
@@ -41,6 +42,7 @@ export class PrismaCompraRepository extends CompraRepository {
         data: {
           id_proveedor: compra.id_proveedor,
           numero_factura: compra.numero_factura,
+          numero_control: compra.numero_control,
           subtotal: compra.subtotal,
           id_moneda_subtotal: compra.id_moneda_subtotal,
           tasa_referencia: compra.tasa_referencia,
@@ -148,12 +150,19 @@ export class PrismaCompraRepository extends CompraRepository {
     return this._toDomain(c);
   }
 
-  async findAll({ page = 1, limit = 20, id_proveedor, reportable_seniat, estado } = {}) {
+  async findAll({ page = 1, limit = 20, id_proveedor, reportable_seniat, estado, numero_factura, fecha_desde, fecha_hasta } = {}) {
     const skip = (page - 1) * limit;
     const where = {
       ...(id_proveedor ? { id_proveedor: parseInt(id_proveedor) } : {}),
       ...(reportable_seniat !== undefined ? { reportable_seniat: reportable_seniat === 'true' || reportable_seniat === true } : {}),
       ...(estado ? { estado } : {}),
+      ...(numero_factura ? { numero_factura: { contains: numero_factura } } : {}),
+      ...((fecha_desde || fecha_hasta) ? {
+        fecha_compra: {
+          ...(fecha_desde ? { gte: new Date(fecha_desde) } : {}),
+          ...(fecha_hasta ? { lte: new Date(fecha_hasta + 'T23:59:59.999Z') } : {}),
+        }
+      } : {}),
     };
     const [compras, total] = await this.prisma.$transaction([
       this.prisma.compra.findMany({

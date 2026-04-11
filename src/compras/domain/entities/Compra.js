@@ -1,6 +1,6 @@
 export class Compra {
   constructor({
-    id_compra, id_proveedor, fecha_compra, numero_factura,
+    id_compra, id_proveedor, fecha_compra, numero_factura, numero_control,
     subtotal, id_moneda_subtotal, tasa_referencia,
     base_imponible, alicuota_iva, monto_iva, total,
     reportable_seniat, estado,
@@ -10,6 +10,7 @@ export class Compra {
     this.id_proveedor = id_proveedor;
     this.fecha_compra = fecha_compra;
     this.numero_factura = numero_factura ?? null;
+    this.numero_control = numero_control ?? null;
     this.subtotal = subtotal ?? null;
     this.id_moneda_subtotal = id_moneda_subtotal ?? null;
     this.tasa_referencia = tasa_referencia ?? null;

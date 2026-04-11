@@ -99,6 +99,9 @@ import { CreateVentaUseCase, ListVentasUseCase, GetVentaUseCase, AnularVentaUseC
 import { VentasController } from './ventas/presentation/controllers/VentasController.js';
 import { createVentasRoutes } from './ventas/presentation/routes/ventasRoutes.js';
 
+// ── Módulo de Reportes ─────────────────────────────────────────
+import { createReportesRoutes } from './reportes/reportesRoutes.js';
+
 const PORT = process.env.PORT || 5000;
 
 const setupDependencies = () => {
@@ -237,6 +240,7 @@ const setupRoutes = (dependencies) => {
   router.use('/facturas',         createCuentasPorPagarRoutes(dependencies.cuentasPorPagarController));
   router.use('/tasas',            createTasasRoutes(dependencies.tasasController));
   router.use('/ventas',           createVentasRoutes(dependencies.ventasController));
+  router.use('/reportes',         createReportesRoutes(dependencies.prisma));
 
   return router;
 };

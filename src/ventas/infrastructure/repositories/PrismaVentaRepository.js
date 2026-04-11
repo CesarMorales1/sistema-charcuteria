@@ -108,9 +108,12 @@ export class PrismaVentaRepository extends VentaRepository {
 
     const anterior = parseFloat(registro.cantidad_actual);
     const nueva    = anterior - cant;
-    if (nueva < 0) {
+
+    // Solo validar stock mínimo en el inventario general.
+    // El inventario legal es para trazabilidad SENIAT y no debe bloquear ventas.
+    if (tipo_inventario === 'general' && nueva < 0) {
       throw new Error(
-        `Stock ${tipo_inventario} insuficiente para producto ${id_producto}. ` +
+        `Stock insuficiente para producto ${id_producto}. ` +
         `Disponible: ${anterior}, solicitado: ${cant}`
       );
     }
